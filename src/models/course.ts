@@ -11,30 +11,30 @@ export interface Course {
   id: string;
   tenKhoaHoc: string;
   giangVien: string;
-  linhVuc: string;
+  moTa: string;
   soHocVien: number;
-  trangThai: string;
+  trangThai: CourseStatus;
 }
 
-export type CourseFormData = Omit<Course, 'id'>;
+export type CourseFormData = Omit<Course, 'id' | 'soHocVien'>;
 
 export interface CourseModel {
   courses: Course[];
   loading: boolean;
   searchText: string;
-  selectedInstructor: string;
-  selectedStatus: CourseStatus | null;
-  sortByStudents: boolean;
+  selectedGiangVien: string;
+  selectedTrangThai: CourseStatus | null;
+  sortBySoHocVien: boolean;
 
   // Actions
   fetchCourses: () => Promise<void>;
-  addCourse: (course: Omit<Course, 'id' | 'studentCount'>) => Promise<void>;
+  addCourse: (course: CourseFormData) => Promise<void>;
   updateCourse: (id: string, course: Partial<Course>) => Promise<void>;
   deleteCourse: (id: string) => Promise<void>;
   setSearchText: (text: string) => void;
-  setSelectedInstructor: (instructor: string) => void;
-  setSelectedStatus: (status: CourseStatus | null) => void;
-  setSortByStudents: (sort: boolean) => void;
+  setSelectedGiangVien: (giangVien: string) => void;
+  setSelectedTrangThai: (trangThai: CourseStatus | null) => void;
+  setSortBySoHocVien: (sort: boolean) => void;
 }
 
 const STORAGE_KEY = 'online_courses';
@@ -43,9 +43,9 @@ export default function useCourseModel(): CourseModel {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
-  const [selectedInstructor, setSelectedInstructor] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState<CourseStatus | null>(null);
-  const [sortByStudents, setSortByStudents] = useState(false);
+  const [selectedGiangVien, setSelectedGiangVien] = useState('');
+  const [selectedTrangThai, setSelectedTrangThai] = useState<CourseStatus | null>(null);
+  const [sortBySoHocVien, setSortBySoHocVien] = useState(false);
 
   const fetchCourses = useCallback(async () => {
     setLoading(true);
@@ -55,7 +55,7 @@ export default function useCourseModel(): CourseModel {
         setCourses(JSON.parse(storedCourses));
       }
     } catch (error) {
-      message.error('Failed to fetch courses');
+      message.error('Không thể tải danh sách khóa học');
     } finally {
       setLoading(false);
     }
@@ -65,50 +65,70 @@ export default function useCourseModel(): CourseModel {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedCourses));
   }, []);
 
-  const addCourse = useCallback(async (courseData: Omit<Course, 'id' | 'studentCount'>) => {
+  const addCourse = useCallback(async (courseData: CourseFormData) => {
     try {
+      // Kiểm tra tên khóa học trùng
+      const isDuplicate = courses.some(
+        course => course.tenKhoaHoc.toLowerCase() === courseData.tenKhoaHoc.toLowerCase()
+      );
+      if (isDuplicate) {
+        message.error('Tên khóa học đã tồn tại');
+        return;
+      }
+
       const newCourse: Course = {
         ...courseData,
         id: Date.now().toString(),
-        studentCount: 0,
+        soHocVien: 0,
       };
 
       const updatedCourses = [...courses, newCourse];
       setCourses(updatedCourses);
       saveToStorage(updatedCourses);
-      message.success('Course added successfully');
+      message.success('Thêm khóa học thành công');
     } catch (error) {
-      message.error('Failed to add course');
+      message.error('Không thể thêm khóa học');
     }
   }, [courses, saveToStorage]);
 
   const updateCourse = useCallback(async (id: string, courseData: Partial<Course>) => {
     try {
+      // Kiểm tra tên khóa học trùng (trừ khóa học hiện tại)
+      const isDuplicate = courses.some(
+        course => 
+          course.id !== id && 
+          course.tenKhoaHoc.toLowerCase() === courseData.tenKhoaHoc?.toLowerCase()
+      );
+      if (isDuplicate) {
+        message.error('Tên khóa học đã tồn tại');
+        return;
+      }
+
       const updatedCourses = courses.map(course =>
         course.id === id ? { ...course, ...courseData } : course
       );
       setCourses(updatedCourses);
       saveToStorage(updatedCourses);
-      message.success('Course updated successfully');
+      message.success('Cập nhật khóa học thành công');
     } catch (error) {
-      message.error('Failed to update course');
+      message.error('Không thể cập nhật khóa học');
     }
   }, [courses, saveToStorage]);
 
   const deleteCourse = useCallback(async (id: string) => {
     try {
       const courseToDelete = courses.find(course => course.id === id);
-      if (courseToDelete && courseToDelete.studentCount > 0) {
-        message.error('Cannot delete course with existing students');
+      if (courseToDelete && courseToDelete.soHocVien > 0) {
+        message.error('Không thể xóa khóa học đã có học viên');
         return;
       }
 
       const updatedCourses = courses.filter(course => course.id !== id);
       setCourses(updatedCourses);
       saveToStorage(updatedCourses);
-      message.success('Course deleted successfully');
+      message.success('Xóa khóa học thành công');
     } catch (error) {
-      message.error('Failed to delete course');
+      message.error('Không thể xóa khóa học');
     }
   }, [courses, saveToStorage]);
 
@@ -116,16 +136,16 @@ export default function useCourseModel(): CourseModel {
     courses,
     loading,
     searchText,
-    selectedInstructor,
-    selectedStatus,
-    sortByStudents,
+    selectedGiangVien,
+    selectedTrangThai,
+    sortBySoHocVien,
     fetchCourses,
     addCourse,
     updateCourse,
     deleteCourse,
     setSearchText,
-    setSelectedInstructor,
-    setSelectedStatus,
-    setSortByStudents,
+    setSelectedGiangVien,
+    setSelectedTrangThai,
+    setSortBySoHocVien,
   };
 } 

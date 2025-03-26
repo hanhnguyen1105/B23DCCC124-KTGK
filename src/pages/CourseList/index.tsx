@@ -1,8 +1,9 @@
 import { Button, Card, Col, Form, Input, Modal, Row, Select, Space, Table, Tag, Typography, message } from 'antd';
 import { useEffect, useState } from 'react';
-import { Course, CourseFormData } from '@/models/course';
+import { Course, CourseStatus } from '@/models/course';
 import { courseService } from '@/services/courseService';
 import CourseForm from '@/components/CourseForm';
+import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -15,9 +16,10 @@ const CourseList: React.FC = () => {
   const [form] = Form.useForm();
   const [searchForm] = Form.useForm();
   const [searchText, setSearchText] = useState('');
-  const [selectedField, setSelectedField] = useState<string>('');
-  const [sortField, setSortField] = useState<keyof Course>('tenKhoaHoc');
-  const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>('ascend');
+  const [selectedGiangVien, setSelectedGiangVien] = useState<string>('');
+  const [selectedTrangThai, setSelectedTrangThai] = useState<CourseStatus | null>(null);
+  const [sortBySoHocVien, setSortBySoHocVien] = useState(false);
+  const [giangVienList, setGiangVienList] = useState<string[]>([]);
 
   useEffect(() => {
     loadCourses();
@@ -28,6 +30,7 @@ const CourseList: React.FC = () => {
     try {
       const data = courseService.getAllCourses();
       setCourses(data);
+      setGiangVienList(courseService.getGiangVienList());
     } catch (error) {
       message.error('Không thể tải danh sách khóa học');
     } finally {
@@ -49,9 +52,23 @@ const CourseList: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      await courseService.deleteCourse(id);
-      message.success('Xóa khóa học thành công');
-      loadCourses();
+      const course = courses.find(c => c.id === id);
+      if (course && course.soHocVien > 0) {
+        message.error('Không thể xóa khóa học đã có học viên');
+        return;
+      }
+
+      Modal.confirm({
+        title: 'Xác nhận xóa',
+        content: 'Bạn có chắc chắn muốn xóa khóa học này?',
+        okText: 'Xóa',
+        cancelText: 'Hủy',
+        onOk: async () => {
+          await courseService.deleteCourse(id);
+          message.success('Xóa khóa học thành công');
+          loadCourses();
+        },
+      });
     } catch (error) {
       message.error('Không thể xóa khóa học');
     }
@@ -76,35 +93,31 @@ const CourseList: React.FC = () => {
 
   const handleSearch = (values: any) => {
     setSearchText(values.searchText || '');
-    setSelectedField(values.field || '');
+    setSelectedGiangVien(values.giangVien || '');
+    setSelectedTrangThai(values.trangThai || null);
   };
 
   const handleTableChange = (pagination: any, filters: any, sorter: any) => {
-    setSortField(sorter.field as keyof Course);
-    setSortOrder(sorter.order as 'ascend' | 'descend');
+    if (sorter.field === 'soHocVien') {
+      setSortBySoHocVien(sorter.order === 'ascend');
+    }
   };
 
   const columns = [
     {
+      title: 'ID',
+      dataIndex: 'id',
+      key: 'id',
+    },
+    {
       title: 'Tên khóa học',
       dataIndex: 'tenKhoaHoc',
       key: 'tenKhoaHoc',
-      sorter: true,
     },
     {
       title: 'Giảng viên',
       dataIndex: 'giangVien',
       key: 'giangVien',
-    },
-    {
-      title: 'Lĩnh vực',
-      dataIndex: 'linhVuc',
-      key: 'linhVuc',
-      render: (linhVuc: string) => (
-        <Tag color={linhVuc === 'frontend' ? 'blue' : linhVuc === 'backend' ? 'green' : 'purple'}>
-          {linhVuc === 'frontend' ? 'Frontend' : linhVuc === 'backend' ? 'Backend' : 'Mobile'}
-        </Tag>
-      ),
     },
     {
       title: 'Số học viên',
@@ -116,11 +129,15 @@ const CourseList: React.FC = () => {
       title: 'Trạng thái',
       dataIndex: 'trangThai',
       key: 'trangThai',
-      render: (trangThai: string) => (
-        <Tag color={trangThai === 'active' ? 'green' : 'red'}>
-          {trangThai === 'active' ? 'Đang hoạt động' : 'Tạm dừng'}
-        </Tag>
-      ),
+      render: (trangThai: CourseStatus) => {
+        const statusMap = {
+          [CourseStatus.OPEN]: { color: 'green', text: 'Đang mở' },
+          [CourseStatus.CLOSED]: { color: 'red', text: 'Đã kết thúc' },
+          [CourseStatus.PAUSED]: { color: 'orange', text: 'Tạm dừng' },
+        };
+        const status = statusMap[trangThai];
+        return <Tag color={status.color}>{status.text}</Tag>;
+      },
     },
     {
       title: 'Thao tác',
@@ -140,18 +157,20 @@ const CourseList: React.FC = () => {
 
   const filteredCourses = courses
     .filter(course => {
-      if (!searchText) return true;
-      if (selectedField && course.linhVuc !== selectedField) return false;
-      return course.tenKhoaHoc.toLowerCase().includes(searchText.toLowerCase()) ||
-             course.giangVien.toLowerCase().includes(searchText.toLowerCase());
+      if (!searchText && !selectedGiangVien && !selectedTrangThai) return true;
+      
+      const matchSearch = !searchText || 
+        course.tenKhoaHoc.toLowerCase().includes(searchText.toLowerCase());
+      const matchGiangVien = !selectedGiangVien || 
+        course.giangVien === selectedGiangVien;
+      const matchTrangThai = !selectedTrangThai || 
+        course.trangThai === selectedTrangThai;
+
+      return matchSearch && matchGiangVien && matchTrangThai;
     })
     .sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
-      if (sortOrder === 'ascend') {
-        return aValue > bValue ? 1 : -1;
-      }
-      return aValue < bValue ? 1 : -1;
+      if (!sortBySoHocVien) return 0;
+      return a.soHocVien - b.soHocVien;
     });
 
   return (
@@ -161,7 +180,7 @@ const CourseList: React.FC = () => {
           <Title level={2}>Quản lý khóa học</Title>
         </Col>
         <Col>
-          <Button type="primary" onClick={handleAdd}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
             Thêm khóa học
           </Button>
         </Col>
@@ -170,13 +189,22 @@ const CourseList: React.FC = () => {
       <Card className="mb-6">
         <Form form={searchForm} onFinish={handleSearch} layout="inline">
           <Form.Item name="searchText">
-            <Input placeholder="Tìm kiếm khóa học..." style={{ width: 200 }} />
+            <Input placeholder="Tìm kiếm theo tên khóa học..." style={{ width: 200 }} />
           </Form.Item>
-          <Form.Item name="field">
-            <Select placeholder="Chọn lĩnh vực" style={{ width: 150 }} allowClear>
-              <Option value="frontend">Frontend</Option>
-              <Option value="backend">Backend</Option>
-              <Option value="mobile">Mobile</Option>
+          <Form.Item name="giangVien">
+            <Select placeholder="Chọn giảng viên" style={{ width: 200 }} allowClear>
+              {giangVienList.map(giangVien => (
+                <Option key={giangVien} value={giangVien}>
+                  {giangVien}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item name="trangThai">
+            <Select placeholder="Chọn trạng thái" style={{ width: 150 }} allowClear>
+              <Option value={CourseStatus.OPEN}>Đang mở</Option>
+              <Option value={CourseStatus.CLOSED}>Đã kết thúc</Option>
+              <Option value={CourseStatus.PAUSED}>Tạm dừng</Option>
             </Select>
           </Form.Item>
           <Form.Item>
@@ -195,14 +223,13 @@ const CourseList: React.FC = () => {
         onChange={handleTableChange}
       />
 
-      <Modal
-        title={editingCourse ? 'Sửa khóa học' : 'Thêm khóa học'}
-        open={isModalVisible}
-        onOk={handleModalOk}
+      <CourseForm
+        visible={isModalVisible}
         onCancel={() => setIsModalVisible(false)}
-      >
-        <CourseForm form={form} />
-      </Modal>
+        onSubmit={handleModalOk}
+        initialValues={editingCourse || undefined}
+        form={form}
+      />
     </div>
   );
 };

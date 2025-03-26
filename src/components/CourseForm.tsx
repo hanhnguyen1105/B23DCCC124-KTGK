@@ -9,7 +9,7 @@ const { Option } = Select;
 interface CourseFormProps {
   visible: boolean;
   onCancel: () => void;
-  onSubmit: (values: Omit<Course, 'id' | 'studentCount'>) => void;
+  onSubmit: (values: Omit<Course, 'id' | 'soHocVien'>) => void;
   initialValues?: Partial<Course>;
   form: any;
 }
@@ -53,37 +53,42 @@ const CourseForm: React.FC<CourseFormProps> = ({
         <Form.Item
           name="tenKhoaHoc"
           label="Tên khóa học"
-          rules={[{ required: true, message: 'Vui lòng nhập tên khóa học!' }]}
+          rules={[
+            { required: true, message: 'Vui lòng nhập tên khóa học!' },
+            { max: 100, message: 'Tên khóa học không được vượt quá 100 ký tự' },
+            {
+              validator: async (_, value) => {
+                if (value && courseService.isDuplicateTenKhoaHoc(value, initialValues?.id)) {
+                  throw new Error('Tên khóa học đã tồn tại');
+                }
+                return Promise.resolve();
+              },
+            },
+          ]}
         >
-          <Input />
+          <Input placeholder="Nhập tên khóa học" />
         </Form.Item>
 
         <Form.Item
           name="giangVien"
           label="Giảng viên"
-          rules={[{ required: true, message: 'Vui lòng nhập tên giảng viên!' }]}
+          rules={[{ required: true, message: 'Vui lòng chọn giảng viên!' }]}
         >
-          <Input />
-        </Form.Item>
-
-        <Form.Item
-          name="linhVuc"
-          label="Lĩnh vực"
-          rules={[{ required: true, message: 'Vui lòng chọn lĩnh vực!' }]}
-        >
-          <Select>
-            <Select.Option value="frontend">Frontend</Select.Option>
-            <Select.Option value="backend">Backend</Select.Option>
-            <Select.Option value="mobile">Mobile</Select.Option>
+          <Select placeholder="Chọn giảng viên">
+            {courseService.getGiangVienList().map(giangVien => (
+              <Option key={giangVien} value={giangVien}>
+                {giangVien}
+              </Option>
+            ))}
           </Select>
         </Form.Item>
 
         <Form.Item
-          name="soHocVien"
-          label="Số học viên"
-          rules={[{ required: true, message: 'Vui lòng nhập số học viên!' }]}
+          name="moTa"
+          label="Mô tả khóa học"
+          rules={[{ required: true, message: 'Vui lòng nhập mô tả khóa học!' }]}
         >
-          <Input type="number" min={0} />
+          <TextArea rows={4} placeholder="Nhập mô tả khóa học" />
         </Form.Item>
 
         <Form.Item
@@ -91,9 +96,10 @@ const CourseForm: React.FC<CourseFormProps> = ({
           label="Trạng thái"
           rules={[{ required: true, message: 'Vui lòng chọn trạng thái!' }]}
         >
-          <Select>
-            <Select.Option value="active">Đang hoạt động</Select.Option>
-            <Select.Option value="inactive">Tạm dừng</Select.Option>
+          <Select placeholder="Chọn trạng thái">
+            <Option value={CourseStatus.OPEN}>Đang mở</Option>
+            <Option value={CourseStatus.CLOSED}>Đã kết thúc</Option>
+            <Option value={CourseStatus.PAUSED}>Tạm dừng</Option>
           </Select>
         </Form.Item>
       </Form>
