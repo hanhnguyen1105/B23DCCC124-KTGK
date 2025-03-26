@@ -82,19 +82,9 @@ export const layout: RunTimeLayoutConfig = ({ initialState }) => {
 		footerRender: () => <Footer />,
 
 		onPageChange: () => {
-			if (initialState?.currentUser) {
-				const { location } = history;
-				const isUncheckPath = unCheckPermissionPaths.some((path) => window.location.pathname.includes(path));
-
-				if (location.pathname === '/') {
-					history.replace('/dashboard');
-				} else if (
-					!isUncheckPath &&
-					currentRole &&
-					initialState?.authorizedPermissions?.length &&
-					!initialState?.authorizedPermissions?.find((item) => item.rsname === currentRole)
-				)
-					history.replace('/403');
+			const { location } = history;
+			if (location.pathname === '/') {
+				history.replace('/courses');
 			}
 		},
 
@@ -116,9 +106,7 @@ export const layout: RunTimeLayoutConfig = ({ initialState }) => {
 		childrenRender: (dom) => (
 			<OIDCBounder>
 				<ErrorBoundary>
-					{/* <TechnicalSupportBounder> */}
 					<OneSignalBounder>{dom}</OneSignalBounder>
-					{/* </TechnicalSupportBounder> */}
 				</ErrorBoundary>
 			</OIDCBounder>
 		),

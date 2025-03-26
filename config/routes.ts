@@ -1,23 +1,14 @@
 ﻿export default [
 	{
-		path: '/user',
-		layout: false,
-		routes: [
-			{
-				path: '/user/login',
-				layout: false,
-				name: 'login',
-				component: './user/Login',
-			},
-			{
-				path: '/user',
-				redirect: '/user/login',
-			},
-		],
+		path: '/',
+		redirect: '/courses',
 	},
-
-	///////////////////////////////////
-	// DEFAULT MENU
+	{
+		path: '/courses',
+		name: 'Quản lý khóa học',
+		icon: 'book',
+		component: './CourseList',
+	},
 	{
 		path: '/dashboard',
 		name: 'Dashboard',
@@ -78,9 +69,6 @@
 		],
 		layout: false,
 		hideInMenu: true,
-	},
-	{
-		path: '/',
 	},
 	{
 		path: '/403',
